@@ -9,7 +9,7 @@ type
 
   Parser* = ref object of RootObj
     lines: seq[string]
-    # data for current command(ex. line)
+    # data for current command
     cmd*: string
     cmdIndex*: int
     cmdType: Command
@@ -31,7 +31,6 @@ proc initCurrentCmdInfo(p: Parser) =
 
 proc parseAcmd(p: Parser) =
   # @value: value is non-minus decimal or symbol
-  # TODO: handling symbol
   p.cmdType = A_COMMAND
   p.symbol = replace(p.cmd, "@", "")
 

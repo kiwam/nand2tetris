@@ -25,5 +25,5 @@ proc addEntry*(s: var Symbols, symbol: string, address: int) =
 proc containsSymbol*(s: var Symbols, symbol: string): bool =
   return s.contains(symbol) 
 
-proc getAddress*(s: Symbols, symbol: string):int =
+proc getAddress*(s: Symbols, symbol: string): int =
   return s[symbol]

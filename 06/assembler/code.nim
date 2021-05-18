@@ -1,7 +1,5 @@
 import strutils, tables
 
-# type
-
 proc dest*(dest: string): string =
   return case dest:
     of "M":   "001"
