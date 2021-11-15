@@ -118,11 +118,11 @@ proc execCompareJump(w: Writer, jumpMnemonic: string) =
   cmdA(w, "LABEL_EQ")              ## @LABEL_EQ
   cmdC(w, "", "D", jumpMnemonic)   ## c;d
   cmdA(w, "LABEL_NE")              ## @LABEL_NE
-  cmdC(w, "", "0", "JMP")              ## force jump
-  writeLine(w.outfile, "(LABEL_EQ)") ## (LABEL_EQ)
+  cmdC(w, "", "0", "JMP")          ## force jump
+  writeLine(w.outfile, "(LBL_EQ)") ## (LABEL_EQ)
   jumpToSP(w)
   cmdc(w, "M", "0")                ## *SP=-1(true), if equal.
-  writeLine(w.outfile, "(LABEL_NE)") ## (LABEL_NE)
+  writeLine(w.outfile, "(LBL_NE)") ## (LABEL_NE)
   ## do nothing cuz *SP=false previously and do not change if eq.
   increSP(w) # SP++
 
