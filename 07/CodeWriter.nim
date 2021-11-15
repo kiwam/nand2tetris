@@ -113,15 +113,15 @@ proc execCompareJump(w: Writer, jumpMnemonic: string) =
   moveStackDataTo(w, "A")          # A=*SP (get 1st from stack)
   cmdC(w, "D", "A-D")              # D=A-D ('1st' - '2nd')
   jumpToSP(w)
-  cmdc(w, "M", "0")               ## *SP=0(false)  set previously
+  cmdc(w, "M", "0")                ## *SP=0(false)
   # IF D==/>/<0 *SP=true(0xFFFF) else *SP=false(0x0000)
-  cmdA(w, "LABEL_EQ")              ## @LABEL_EQ
+  cmdA(w, "LBL_EQ")                ## @LABEL_EQ
   cmdC(w, "", "D", jumpMnemonic)   ## c;d
-  cmdA(w, "LABEL_NE")              ## @LABEL_NE
+  cmdA(w, "LBL_NE")                ## @LABEL_NE
   cmdC(w, "", "0", "JMP")          ## force jump
   writeLine(w.outfile, "(LBL_EQ)") ## (LABEL_EQ)
   jumpToSP(w)
-  cmdc(w, "M", "-1")                ## *SP=-1(true), if equal.
+  cmdc(w, "M", "-1")               ## *SP=-1(true), if equal.
   writeLine(w.outfile, "(LBL_NE)") ## (LABEL_NE)
   ## do nothing cuz *SP=false previously and do not change if eq.
   increSP(w) # SP++
