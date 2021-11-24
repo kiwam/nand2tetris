@@ -33,6 +33,7 @@ proc translateFiles(infiles: seq[string], outfile: string) =
   writer.initStackPointer()
   for f in infiles:
     var parser: Parser = newParser(f)
+    writer.setFileName(f)
     while parser.hasMoreCommands():
       parser.advance()
       writeAsm(parser, writer)

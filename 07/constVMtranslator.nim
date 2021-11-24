@@ -39,7 +39,8 @@ type
     R_LCL = 1,
     R_ARG = 2,
     R_THIS = 3,
-    R_THAT = 4
+    R_THAT = 4,
+    R_TEMP = 5
 
 type
   Segment* = enum

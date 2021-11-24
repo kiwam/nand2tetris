@@ -1,4 +1,4 @@
-import tables, strutils, sequtils, sugar, re, strformat
+import tables, strutils, sequtils, sugar, re, strformat, os
 import constVMtranslator
 
 type
@@ -6,36 +6,13 @@ type
     outfile*: File
     vmfile: string
 
-proc initCodeWriter(w: Writer, outfile: string)
-proc initStackPointer*(w: Writer)
-proc cmdA(w: Writer, adr: string)
-proc cmdC(w: Writer, dest: string, comp: string, jump: string = "")
-proc setDataToReg(w: Writer, adr: int, data: string)
-# stack
-proc moveDataToStack(w: Writer, data: string)
-proc moveStackDataTo(w: Writer, dest: string)
-# SP related
-proc increSP(w: Writer)
-proc decreSP(w: Writer)
-proc jumpToSP(w: Writer)
+# avoiding forward declaration of functions(proc)
+{.experimental: "codeReordering".}
 
-# arithmetic/logic command
-proc execBinaryFuncCmd(w: Writer, compMnemonic: string)
-proc execUnaryFuncCmd(w: Writer, compMnemonic: string)
-proc execCompareJump(w: Writer, jumpMnemonic: string)
-
-proc setFileName*(w: Writer, fileName: string)
-proc writeArithmetic*(w: Writer, command: string)
-proc writePushOrPop*(w: Writer, cmdType: CommandType, segment: string, index: int)
-proc close*(w: Writer)
-proc newCodeWriter*(outfile: string): Writer
-
-##
-# def
-##
 proc initCodeWriter(w: Writer, outfile: string) =
   writeFile(outfile, "")
   w.outfile = open(outfile, FileMode.fmAppend)
+  w.vmfile = ""
 
 # proc overwriteFile(file: string, content: string) = 
 #   let f = open(file, fmAppend)
@@ -63,7 +40,7 @@ proc cmdC(w: Writer, dest: string, comp: string, jump: string = "") =
 
 proc setDataToReg(w: Writer, adr: int, data: string) =
   cmdA(w, "R" & $adr) # @R#
-  cmdC(w, "M", data)      # *R#=data
+  cmdC(w, "M", data)  # *R#=data
 
 proc moveDataToStack(w: Writer, data: string) =
   cmdA(w, data)      # @[data]
@@ -71,9 +48,54 @@ proc moveDataToStack(w: Writer, data: string) =
   jumpToSP(w)
   cmdC(w, "M", "D")  # *SP=D
 
+proc moveMemDataToStack(w: Writer, segment: string, idx: int) =
+  cmdA(w, $idx)       # A=idx
+  cmdC(w, "D", "A")   # D=A
+  cmdA(w, segment)    # A=segment
+  cmdC(w, "A", "D+A") # A=D+A
+  cmdC(w, "D", "M")   # D=*(segment+idx)
+  jumpToSP(w)         # *SP=D
+  cmdC(w, "M", "D")
+
 proc moveStackDataTo(w: Writer, dest: string) =
   jumpToSP(w)
   cmdC(w, dest, "M") # dest=*SP
+
+proc moveStackDataToMem(w: Writer, segment: string, idx: int) =
+  cmdA(w, $idx)       # A=idx
+  cmdC(w, "D", "A")   # D=A
+  cmdA(w, segment)    # A=segment
+  cmdC(w, "A", "D+A") # A=D+A
+  moveStackDataTo(w, "D") # D=*SP
+  cmdC(w, "M", "D")   # *A=D
+
+proc moveRegDataToStack(w: Writer, segment: string, idx: int) =
+  let baseAddr = {"pointer": R_THIS, "temp": R_TEMP}.toTable
+  let reg: int = int(baseAddr[segment]) + idx
+  cmdA(w, "R" & $reg) # @R#
+  cmdC(w, "D", "M")   # D=*R#
+  jumpToSP(w)
+  cmdC(w, "M", "D")   # *SP=D
+
+proc moveStackDataToReg(w: Writer, segment: string, idx: int) =
+  let baseAddr = {"pointer": R_THIS, "temp": R_TEMP}.toTable
+  let reg: int = int(baseAddr[segment]) + idx
+  moveStackDataTo(w, "D") # D=*SP
+  cmdA(w, "R" & $reg)     # @R#
+  cmdC(w, "M", "D")       # *R#=D
+
+proc moveStaticDataToStack(w: Writer, segment: string, idx: int) =
+  let file = lastPathPart(w.vmfile).split('.')[0] ## assume only one dot in file name
+  cmdA(w, file & "." & $idx) # A=vmfile.#
+  cmdC(w, "D", "M")              # D=M
+  jumpToSP(w)
+  cmdC(w, "M", "D")              # *SP=D
+
+proc moveStackDataToStatic(w: Writer, segment: string, idx: int) =
+  let file = lastPathPart(w.vmfile).split('.')[0] ## assume only one dot in file name
+  moveStackDataTo(w, "D")        # D=*SP
+  cmdA(w, file & "." & $idx) # A=vmfile.#
+  cmdC(w, "M", "D")              # *(vmfile.#)=D
 
 proc increSP(w: Writer) =
   cmdA(w, "SP")
@@ -149,15 +171,30 @@ proc writeArithmetic*(w: Writer, command: string) =
   return
 
 proc writePushOrPop*(w: Writer, cmdType: CommandType, segment: string, index: int) =
-  if cmdType == C_PUSH:
-    if segment == $S_CONST:
+  case cmdType:
+  of C_PUSH:
+    case segment:
+    of $S_CONST:
       moveDataToStack(w, $index)
-    # more. case segment. static/memory/register
+    of $S_LCL, $S_ARG, $S_THIS, $S_THAT:
+      moveMemDataToStack(w, segment, index)
+    of $S_POINTER, $S_TEMP:
+      moveRegDataToStack(w, segment, index)
+    of $S_STATIC:
+      moveStaticDataToStack(w, segment, index)
     increSP(w) # SP++
-  if cmdType == C_POP:
-    # TODO
+  of C_POP:
     # set data to each segmentt static/memory/register
     decreSP(w) # SP--, first!
+    case segment:
+    of $S_LCL, $S_ARG, $S_THIS, $S_THAT:
+      moveStackDataToMem(w, segment, index)
+    of $S_POINTER, $S_TEMP:
+      moveStackDataToReg(w, segment, index)
+    of $S_STATIC:
+      moveStackDataToStatic(w, segment, index)
+  else:
+    discard
 
 proc close*(w: Writer) =
   close(w.outfile)
