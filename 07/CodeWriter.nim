@@ -87,15 +87,15 @@ proc moveStackDataToReg(w: Writer, segment: string, idx: int) =
 proc moveStaticDataToStack(w: Writer, segment: string, idx: int) =
   let file = lastPathPart(w.vmfile).split('.')[0] ## assume only one dot in file name
   cmdA(w, file & "." & $idx) # A=vmfile.#
-  cmdC(w, "D", "M")              # D=M
+  cmdC(w, "D", "M")          # D=M
   jumpToSP(w)
-  cmdC(w, "M", "D")              # *SP=D
+  cmdC(w, "M", "D")          # *SP=D
 
 proc moveStackDataToStatic(w: Writer, segment: string, idx: int) =
   let file = lastPathPart(w.vmfile).split('.')[0] ## assume only one dot in file name
-  moveStackDataTo(w, "D")        # D=*SP
+  moveStackDataTo(w, "D")    # D=*SP
   cmdA(w, file & "." & $idx) # A=vmfile.#
-  cmdC(w, "M", "D")              # *(vmfile.#)=D
+  cmdC(w, "M", "D")          # *(vmfile.#)=D
 
 proc increSP(w: Writer) =
   cmdA(w, "SP")
@@ -184,8 +184,7 @@ proc writePushOrPop*(w: Writer, cmdType: CommandType, segment: string, index: in
       moveStaticDataToStack(w, segment, index)
     increSP(w) # SP++
   of C_POP:
-    # set data to each segmentt static/memory/register
-    decreSP(w) # SP--, first!
+    decreSP(w)
     case segment:
     of $S_LCL, $S_ARG, $S_THIS, $S_THAT:
       moveStackDataToMem(w, segment, index)
